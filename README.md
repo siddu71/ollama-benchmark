@@ -25,7 +25,7 @@ llm_benchmark/data/
 ├── benchmark_models_8gb_ram.yml
 
 ```
-Add models you want to benchmarks into relavant file based on you gpu vram
+Add models you want to benchmarks into relavant file based on you gpu vram :: ~/ollama-benchmark/llm_benchmark/data/benchmark_models_16gb_ram.yml
 
 ```
  l/d/benchmark_models_16gb_ram.yml
@@ -83,5 +83,10 @@ Add models and corresponding prompts into ~/ollama-benchmark/llm_benchmark/data/
 Make sure model you want to benchmark is on both benchmark1.yml and benchmark_models_16gb_ram.yml
 
 
+cd into ollama-benchmark dir and run the following command to start the benchmark
+
+```
+(ollama) siddu@ubuntu-homelab:~/ollama-benchmark$ python -m llm_benchmark.main run
+```
 
 
