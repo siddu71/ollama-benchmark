@@ -1,119 +1,140 @@
 import argparse
+import tabulate
 import yaml
 import subprocess
 import datetime
-import pkg_resources
+import time
+from tabulate import tabulate
 
 parser = argparse.ArgumentParser(
     prog="python3 check_models.py",
-    description="Before running check_models.py, please make sure you installed ollama successfully \
-        on macOS, Linux, or WSL2 on Windows. You can check the website: https://ollama.com",
-    epilog="Author: Jason Chuang")
+    description="Benchmark LLM models using ollama, focusing on chat chaining and realistic tokens/s.",
+    epilog="Author: Jason Chuang"
+)
 
-parser.add_argument("-v",
-                    "--verbose",
+parser.add_argument("-v", "--verbose",
                     action="store_true",
-                    help="this program helps you check whether you have ollama benchmark models installed")
+                    help="Print more details during execution")
 
-parser.add_argument("-m",
-                    "--models",
+parser.add_argument("-m", "--models",
                     type=str,
-                    help="provide benchmark models YAML file path. ex. ../data/benchmark_models.yml")
+                    help="Path to a benchmark models YAML file, e.g., ../data/benchmark_models.yml")
 
-parser.add_argument("-b",
-                    "--benchmark",
+parser.add_argument("-b", "--benchmark",
                     type=str,
-                    help="provide benchmark YAML file path. ex. ../data/benchmark1.yml")
+                    help="Path to a benchmark config YAML, e.g., ../data/benchmark1.yml")
 
-parser.add_argument("-t",
-                    "--type",
+parser.add_argument("-t", "--type",
                     type=str,
-                    help="provide benchmark model type. ex, instruct")
-
+                    help="Type of benchmark scenario (e.g., chat, instruct, etc.)")
 
 def parse_yaml(yaml_file_path):
-    with open(yaml_file_path, 'r') as stream:
-        try:
-            data=yaml.safe_load(stream)
-            #print(d)
-        except yaml.YAMLError as e:
-            print(e)
-    return data
+    """ Safely parse a YAML file. """
+    try:
+        with open(yaml_file_path, 'r') as stream:
+            return yaml.safe_load(stream)
+    except FileNotFoundError:
+        print(f"Error: File not found - {yaml_file_path}")
+        return {}
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML: {e}")
+        return {}
 
-def run_benchmark(models_file_path, benchmark_file_path, type, ollamabin):
-    
+def approximate_token_count(text):
+    """ Approximate token count using a simple word-to-token ratio. """
+    words = text.strip().split()
+    return int(len(words) * 0.75)
+
+def run_benchmark(models_file_path, benchmark_file_path, scenario_type, ollamabin):
     models_dict = parse_yaml(models_file_path)
     benchmark_dict = parse_yaml(benchmark_file_path)
-    model_type = type
-    allowed_models = {e['model'] for e in models_dict['models']}
-    #print(allowed_models)
-    ans={}
-    # Writing to file        
-    for one_model_type in benchmark_dict['modeltypes']:
-        #print(one_model_type)
-        if (one_model_type['type']==model_type):
-            #print(one_model_type['models'])
-            #print(one_model_type['prompts'])
-            for onemodel in one_model_type['models']:
-                if (onemodel['model'] in allowed_models ):
-                    loc_dt = datetime.datetime.today()
-                    with open(f'log_{loc_dt.strftime("%Y-%m-%d-%H%M%S")}.log', "w", encoding='utf-8') as file1:
-                        #print(onemodel)
-                        stored_nums=[]
-                        model_name = onemodel['model']
-                        print(f'model_name =    {model_name}')
-                        file1.write(f'\nmodel_name =    {model_name}\n')
-                        
-                        if model_name.startswith('llava'):
-                            for one_prompt in one_model_type['prompts']:
-                                img_file_names = one_prompt['keywords'].split(',')
-                                for img in img_file_names:
-                                    img_file_path = pkg_resources.resource_filename('llm_benchmark',f'data/img/{img}')
-                                    prompt = f"{one_prompt['prompt']} {img_file_path}"
-                                    print(f"prompt = {prompt}")
-                                    result = subprocess.run([ollamabin, 'run', model_name, one_prompt['prompt'],'--verbose'], capture_output=True, text=True, check=True, encoding='utf-8')
-                                    std_err = result.stderr
-                                    #print(result.stderr)
-                                    file1.write(std_err)
-                                    
-                                    for line in std_err.split('\n'):
-                                        if ('eval rate' in line) and ('prompt' not in line):
-                                            print(line)
-                                            number = float(line[-20:-8])
-                                            stored_nums.append(number)
-                                            #print(number)
-                        else:
-                            for one_prompt in one_model_type['prompts']:
-                                print(f"prompt = {one_prompt['prompt']}")
-                                result = subprocess.run([ollamabin, 'run', model_name, one_prompt['prompt'],'--verbose'], capture_output=True, text=True, check=True, encoding='utf-8')
-                                std_err = result.stderr
-                                #print(result.stderr)                                   
-                                file1.write(std_err)                                    
-                                
-                                for line in std_err.split('\n'):
-                                    if ('eval rate' in line) and ('prompt' not in line):
-                                        print(line)
-                                        number = float(line[-20:-8])
-                                        stored_nums.append(number)
-                                        #print(number)
 
-                        print("-"*20) 
-                        if(len(stored_nums)!=0):       
-                            average = sum(stored_nums)/len(stored_nums)
-                            print("Average of eval rate: ", round(average,3), " tokens/s")
-                            ans[f"{model_name}"]=f"{round(average,3):.2f}"
+    allowed_models = {m['model'] for m in models_dict.get('models', [])}
+    results = {}
+    table_data = []
 
-                        print("-"*40)
-                        file1.write("\n"+"-"*40)
-                    file1.close()
-                    
-    return ans
+    for block in benchmark_dict.get('modeltypes', []):
+        if block.get('type') == scenario_type:
+            print("Scenario Type:", scenario_type)
+            prompts = block.get('prompts', [])
+            model_list = block.get('models', [])
 
-if __name__ == "__main__": 
+            for model_info in model_list:
+                model_name = model_info.get('model')
+                if model_name not in allowed_models:
+                    continue
+
+                loc_dt = datetime.datetime.now()
+                log_filename = f"log_{loc_dt.strftime('%Y-%m-%d-%H%M%S')}.log"
+                print(f"Model Name = {model_name}")
+                stored_tps = []
+                conversation_text = ""
+
+                with open(log_filename, "w", encoding='utf-8') as logf:
+                    logf.write(f"Model Name = {model_name}\n")
+
+                    for prompt_item in prompts:
+                        user_prompt = prompt_item.get('prompt', '').strip()
+                        conversation_text += f"\nUser: {user_prompt}\nAssistant:"
+                        input_text = conversation_text if scenario_type.lower() == 'chat' else user_prompt
+
+                        print(f"Prompt: {user_prompt}")
+                        print(f"Input Text: {input_text}")
+
+                        try:
+                            start_time = time.time()
+                            result = subprocess.run(
+                                [ollamabin, 'run', model_name, input_text, '--verbose'],
+                                capture_output=True, text=True, check=True, timeout=360
+                            )
+                            stdout_text = result.stdout
+                            stderr_text = result.stderr
+                            end_time = time.time()
+
+                            elapsed = end_time - start_time
+                            new_response = stdout_text.strip()
+                            output_tokens = approximate_token_count(new_response)
+                            input_tokens = approximate_token_count(input_text)
+                            tps = output_tokens / elapsed if elapsed > 0 else 0
+
+                            logf.write(f"Prompt: {input_text}\n--- STDOUT ---\n{stdout_text}\n--- STDERR ---\n{stderr_text}\n")
+                            print(f"Output Tokens: {output_tokens}, Elapsed Time: {elapsed:.2f}s, Tokens/s: {tps:.2f}")
+
+                            table_data.append([
+                                model_name, user_prompt, input_tokens, output_tokens, f"{elapsed:.2f}s", f"{tps:.2f}"
+                            ])
+
+                            if scenario_type.lower() == 'chat':
+                                conversation_text += f" {new_response}"
+                            stored_tps.append(tps)
+
+                        except subprocess.CalledProcessError as e:
+                            print(f"Error running model {model_name}: {e.stderr}")
+                            logf.write(f"Subprocess Error: {e.stderr}\n")
+                            continue
+                        except subprocess.TimeoutExpired as e:
+                            print(f"Timeout expired for model {model_name} with prompt {user_prompt}")
+                            logf.write(f"Timeout expired for model {model_name} with prompt {user_prompt}\n")
+                            continue
+                        except Exception as e:
+                            print(f"Unhandled error for model {model_name}: {str(e)}")
+                            logf.write(f"Unhandled error for model {model_name}: {str(e)}\n")
+                            continue
+
+                avg_rate = sum(stored_tps) / len(stored_tps) if stored_tps else 0.0
+                results[model_name] = f"{avg_rate:.2f}"
+                print(f"Average Tokens/s for {model_name}: {avg_rate:.2f}")
+
+    # Print table at the end
+    print("\nBenchmark Results:")
+    headers = ["Model Name", "Prompt", "Input Tokens", "Output Tokens", "Elapsed Time", "Tokens/s"]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
+
+    return results
+
+if __name__ == "__main__":
     args = parser.parse_args()
-    #print(f"args.verbose value：{args.verbose}")
-    if (args.models is not None) and (args.benchmark is not None) and (args.type is not None):
-        run_benchmark(args.models, args.benchmark, args.type)
-        print('-'*40)
-        
-        
+    if args.models and args.benchmark and args.type:
+        benchmark_results = run_benchmark(args.models, args.benchmark, args.type, 'ollama')
+        print("Final Results:", benchmark_results)
+

@@ -2,10 +2,17 @@
 # License: MIT
 version: 1.0
 models:
-  - model: phi3:3.8b
-  - model: qwen2:7b
-  - model: gemma2:9b
-  - model: mistral:7b
-  - model: llama3.1:8b
-  - model: llava:7b
-  - model: llava:13b
+  - model: qwen2.5-coder:32b
+  - model: qwen2.5-coder:14b
+    #- model: deepseek-coder-v2-fixed:latest
+    #- model: phi4:latest
+    #- model: qwen2.5:14b
+    #- model: qwen2.5:7b
+    #- model: qwq:32b
+    #- model: phi3:3.8b
+    #- model: qwen2:7b
+    #- model: gemma2:9b
+    #- model: mistral:7b
+    #- model: llama3.1:8b
+    #- model: llava:7b
+    #- model: llava:13b

@@ -3,15 +3,32 @@
 version: 1.0
 modeltypes:
   - type: chat
+    models:
+      - model: qwen2.5-coder:32b
+      - model: qwen2.5-coder:14b
+      #- model: deepseek-coder-v2-fixed:latest 
+      #- model: phi4:latest
+      #- model: qwen2.5:14b
+      #- model: qwen2.5:7b
     prompts:
-      - prompt: What are your thoughts on the latest scientific discovery regarding black holes?
-        keywords: science, recent
-  - type: completion
-    prompts:
-      - prompt: In a world where time travel is possible, a scientist invents a device that allows people to visit any historical event. One day, a young woman decides to travel back in time to...
-        keywords:
+      - prompt: Develop a web scraper using BeautifulSoup and Python to extract product information from an e-commerce website.
+        keywords: python, web scraping, beautifulsoup
+      - prompt: Write a Go program that uses the Gorilla WebSocket library to establish a real-time communication channel between a client and server.
+        keywords: go, websockets, gorilla
+      - prompt: Implement a Ruby on Rails API using Active Record to manage a database of users, including authentication and authorization features.
+        keywords: ruby, rails, api, active record
+      - prompt: Create a Node.js application that uses the Express framework to build a RESTful API for managing books in a library, including CRUD operations.
+        keywords: nodejs, express, restful api
+      - prompt: Develop a Java Spring Boot application that integrates with a MySQL database to manage employee information, including data validation and security features.
+        keywords: java, spring boot, mysql
+      - prompt: Implement a Flask API using SQLAlchemy to manage a database of products, including data modeling and serialization.
+        keywords: python, flask, sqlalchemy
   - type: instruct
     models:
+      - model: deepseek-coder-v2-fixed:latest 
+      - model: phi4:latest
+      - model: qwen2.5:14b
+      - model: qwen2.5:7b
       - model: mistral:7b
       - model: llama3:8b
       - model: llama3.1:8b
