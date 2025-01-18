@@ -6,6 +6,14 @@ LLM Benchmark for Throughput via Ollama (Local LLMs)
 
 Working [Ollama](https://ollama.com) installation.
 
+Create a virtual env (optional)
+
+Install Requirements
+```
+cd ollama-benchmark
+pip install -r requirements.txt
+```
+
 ## Usage Steps
 
 ```
